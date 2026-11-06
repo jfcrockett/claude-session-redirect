@@ -1,0 +1,45 @@
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  background: Canvas;
+  color: CanvasText;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  margin: 2rem auto;
+  max-width: 38rem;
+  padding: 0 1rem;
+}
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+a {
+  color: LinkText;
+  display: inline-block;
+  margin: 0 1rem 0.5rem 0;
+}
+
+a:focus-visible {
+  outline: 2px solid CanvasText;
+  outline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#session-id:empty {
+  display: none;
+}
+
+code {
+  font-family: ui-monospace, monospace;
+}
+
+.note {
+  margin-top: 2rem;
+}

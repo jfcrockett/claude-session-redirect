@@ -1,0 +1,11 @@
+{
+  "name": "claude-session-redirect",
+  "private": true,
+  "description": "Static page that opens one validated Claude Code session id.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

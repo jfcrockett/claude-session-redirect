@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Open session</title>
+  <link rel="stylesheet" href="../site.css">
+</head>
+<body>
+  <main>
+    <h1>Open session</h1>
+    <p id="status" role="status">Checking the session link.</p>
+    <p id="error" role="alert" hidden></p>
+    <p id="session-line" hidden>Session id: <span id="session-id"></span></p>
+    <p id="actions" hidden>
+      <a id="open-app" rel="noreferrer">Open in Claude</a>
+      <a id="open-web" rel="noreferrer noopener">Open in browser</a>
+    </p>
+    <noscript>
+      <p>JavaScript is off, so this page cannot check the session id. It does not send the id anywhere.</p>
+    </noscript>
+    <p class="note">This page builds only a Claude app link and a claude.ai link from the s parameter. It does not store the id or load anything else.</p>
+  </main>
+  <script src="redirect.js"></script>
+  <script src="page.js"></script>
+</body>
+</html>

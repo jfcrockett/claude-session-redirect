@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Claude session redirect</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main>
+    <h1>Claude session redirect</h1>
+    <p>This repository publishes one static utility page. It checks a session id and opens Claude.</p>
+    <p>On GitHub Pages the path is <code>/claude-session-redirect/cc/?s=session_…</code>. The <code>s</code> parameter must be <code>session_</code> followed by letters and digits, and it must appear once.</p>
+    <p>The utility page tries the Claude app, then keeps two links: Open in Claude, and Open in browser. It does not load analytics, store the id, or accept any other destination.</p>
+    <p><a href="cc/?s=session_01XANLEKYHhnouszW5pTBCm6">Example session link</a></p>
+  </main>
+</body>
+</html>
