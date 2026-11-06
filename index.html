@@ -14,7 +14,7 @@
     <h1>Claude session redirect</h1>
     <p>This repository publishes one static utility page. It checks a session id and opens Claude.</p>
     <p>On GitHub Pages the path is <code>/claude-session-redirect/cc/?s=session_…</code>. The <code>s</code> parameter must be <code>session_</code> followed by letters and digits, and it must appear once.</p>
-    <p>The utility page tries the Claude app, then keeps two links: Open in Claude, and Open in browser. It does not load analytics, store the id, or accept any other destination.</p>
+    <p>The utility page tries the Claude app, then keeps two links: Open in Claude, and Open in browser. If the browser allows it, the tab closes after the page has been in the background. If the browser keeps the tab open, you can close it. The page does not load analytics, store the id, or accept any other destination.</p>
     <p><a href="cc/?s=session_01XANLEKYHhnouszW5pTBCm6">Example session link</a></p>
   </main>
 </body>

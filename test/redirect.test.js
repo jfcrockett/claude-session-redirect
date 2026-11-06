@@ -350,3 +350,260 @@ test("page.js wires the real document search to the same fallbacks", () => {
   assert.equal(doc2.nodes["open-app"].textContent, "Open in Claude");
   assert.equal(doc2.nodes["open-web"].textContent, "Open in browser");
 });
+
+function fakeClock() {
+  const timers = [];
+  let nextId = 1;
+  return {
+    timers,
+    setTimer(fn, ms) {
+      const id = nextId;
+      nextId += 1;
+      timers.push({ id, fn, ms, cleared: false });
+      return id;
+    },
+    clearTimer(id) {
+      const timer = timers.find((item) => item.id === id);
+      if (timer) timer.cleared = true;
+    },
+    pending() {
+      return timers.filter((timer) => !timer.cleared);
+    },
+  };
+}
+
+function fakeWindow() {
+  const calls = [];
+  const listeners = [];
+  return {
+    closed: false,
+    calls,
+    listeners,
+    close() {
+      calls.push("close");
+    },
+    addEventListener(type) {
+      listeners.push(type);
+    },
+  };
+}
+
+function clickableDoc() {
+  const doc = fakeDoc();
+  const listeners = { visibilitychange: [] };
+  doc.visibilityState = "visible";
+  doc.listenerTypes = [];
+  doc.addEventListener = (type, fn) => {
+    doc.listenerTypes.push(type);
+    if (!listeners[type]) listeners[type] = [];
+    listeners[type].push(fn);
+  };
+  doc.setVisibility = (state) => {
+    doc.visibilityState = state;
+    for (const fn of listeners.visibilitychange) fn();
+  };
+  for (const id of ["open-app", "open-web"]) {
+    const node = doc.nodes[id];
+    const clicks = [];
+    node.addEventListener = (type, fn) => {
+      if (type === "click") clicks.push(fn);
+    };
+    node.click = () => {
+      for (const fn of clicks) fn();
+    };
+  }
+  return doc;
+}
+
+function firePending(clock) {
+  const pending = clock.pending();
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].ms, api.HANDOFF_CLOSE_DELAY_MS);
+  pending[0].fn();
+}
+
+test("close delay is between 1 and 1.5 seconds and the hint does not claim the app opened", () => {
+  assert.equal(api.HANDOFF_CLOSE_DELAY_MS, 1200);
+  assert.ok(api.HANDOFF_CLOSE_DELAY_MS >= 1000 && api.HANDOFF_CLOSE_DELAY_MS <= 1500);
+  assert.equal(api.CLOSE_HINT, "If Claude opened, you can close this tab.");
+});
+
+test("automatic handoff does not close while the page stays visible", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, recordingLocation(), win, clock);
+  assert.deepEqual(clock.timers, []);
+  assert.deepEqual(win.calls, []);
+  assert.deepEqual(win.listeners, []);
+  assert.deepEqual(doc.listenerTypes, ["visibilitychange"]);
+  assert.equal(doc.nodes.status.textContent, "Trying to open the Claude app. If it does not open, use a link below.");
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+});
+
+test("automatic handoff closes only after the page was visible and then stays hidden", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, recordingLocation(), win, clock);
+  doc.setVisibility("hidden");
+  assert.equal(clock.pending().length, 1);
+  assert.equal(win.calls.length, 0);
+  doc.setVisibility("visible");
+  assert.equal(clock.pending().length, 0);
+  assert.equal(win.calls.length, 0);
+  assert.equal(doc.nodes.status.textContent, "Trying to open the Claude app. If it does not open, use a link below.");
+
+  doc.setVisibility("hidden");
+  firePending(clock);
+  assert.deepEqual(win.calls, ["close"]);
+  assert.equal(doc.nodes.status.textContent, api.CLOSE_HINT);
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+  assert.equal(doc.nodes["open-app"].textContent, "Open in Claude");
+  assert.equal(doc.nodes["open-web"].textContent, "Open in browser");
+  assert.equal(doc.nodes.actions.hidden, false);
+});
+
+test("a close timer that races a visible page does not close, and a successful close skips the hint", () => {
+  const refused = clickableDoc();
+  const refusedWin = fakeWindow();
+  const refusedClock = fakeClock();
+  api.renderSessionPage(refused, "?s=" + EXAMPLE, recordingLocation(), refusedWin, refusedClock);
+  refused.setVisibility("hidden");
+  refused.visibilityState = "visible";
+  refusedClock.pending()[0].fn();
+  assert.deepEqual(refusedWin.calls, []);
+  assert.equal(refused.nodes.status.textContent, "Trying to open the Claude app. If it does not open, use a link below.");
+
+  const closed = clickableDoc();
+  const closedWin = fakeWindow();
+  closedWin.close = function () {
+    this.calls.push("close");
+    this.closed = true;
+  };
+  const closedClock = fakeClock();
+  api.renderSessionPage(closed, "?s=" + EXAMPLE, recordingLocation(), closedWin, closedClock);
+  closed.setVisibility("hidden");
+  firePending(closedClock);
+  assert.deepEqual(closedWin.calls, ["close"]);
+  assert.equal(closed.nodes.status.textContent, "Trying to open the Claude app. If it does not open, use a link below.");
+});
+
+test("explicit Open in Claude uses the same close rule and the browser link does not", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, null, win, clock);
+  assert.equal(clock.timers.length, 0);
+  doc.nodes["open-web"].click();
+  doc.setVisibility("hidden");
+  assert.equal(clock.timers.length, 0);
+  assert.deepEqual(win.calls, []);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+
+  doc.setVisibility("visible");
+  doc.nodes["open-app"].click();
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  doc.setVisibility("hidden");
+  firePending(clock);
+  assert.deepEqual(win.calls, ["close"]);
+  assert.equal(doc.nodes.status.textContent, api.CLOSE_HINT);
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+});
+
+test("a tampered Open in Claude href does not arm closing", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, null, win, clock);
+  doc.nodes["open-app"].setAttribute("href", "https://evil.example");
+  doc.nodes["open-app"].click();
+  doc.setVisibility("hidden");
+  assert.equal(clock.timers.length, 0);
+  assert.deepEqual(win.calls, []);
+});
+
+test("invalid, missing, and duplicate ids never schedule a close", () => {
+  const searches = [
+    "",
+    "?s=",
+    "?s=https://evil.example",
+    "?s=javascript:alert(1)",
+    "?s=" + EXAMPLE + "&s=" + EXAMPLE,
+    "?s=" + EXAMPLE + "&s=https://evil.example",
+  ];
+  for (const search of searches) {
+    const doc = clickableDoc();
+    const win = fakeWindow();
+    const clock = fakeClock();
+    const result = api.renderSessionPage(doc, search, recordingLocation(), win, clock);
+    assert.equal(result.ok, false, search);
+    doc.setVisibility("hidden");
+    doc.nodes["open-app"].click();
+    assert.equal(clock.timers.length, 0, search);
+    assert.deepEqual(win.calls, [], search);
+    assert.equal(doc.nodes.status.textContent.includes(api.CLOSE_HINT), false, search);
+    assert.equal(doc.nodes["open-app"].getAttribute("href"), null, search);
+  }
+});
+
+test("a failed automatic handoff does not close, and a later explicit click can", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  const location = {
+    assign() {
+      throw new Error("protocol blocked");
+    },
+  };
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, location, win, clock);
+  doc.setVisibility("hidden");
+  assert.equal(clock.timers.length, 0);
+  assert.deepEqual(win.calls, []);
+  assert.equal(doc.nodes.status.textContent, "The Claude app did not open automatically. Use a link below.");
+  doc.setVisibility("visible");
+  doc.nodes["open-app"].click();
+  doc.setVisibility("hidden");
+  firePending(clock);
+  assert.deepEqual(win.calls, ["close"]);
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+});
+
+test("a page that loads hidden does not close until it has been visible", () => {
+  const doc = clickableDoc();
+  doc.visibilityState = "hidden";
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(doc, "?s=" + EXAMPLE, recordingLocation(), win, clock);
+  doc.setVisibility("hidden");
+  assert.equal(clock.timers.length, 0);
+  doc.setVisibility("visible");
+  assert.equal(clock.timers.length, 0);
+  doc.setVisibility("hidden");
+  assert.equal(clock.pending().length, 1);
+  assert.equal(clock.pending()[0].ms, 1200);
+});
+
+test("an extra parameter does not change destinations or the close rule", () => {
+  const doc = clickableDoc();
+  const win = fakeWindow();
+  const clock = fakeClock();
+  api.renderSessionPage(
+    doc,
+    "?s=" + EXAMPLE + "&next=https://evil.example&url=javascript:alert(1)",
+    recordingLocation(),
+    win,
+    clock,
+  );
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+  assert.equal(combinedText(doc).includes("evil.example"), false);
+  doc.setVisibility("hidden");
+  firePending(clock);
+  assert.deepEqual(win.calls, ["close"]);
+  assert.equal(doc.nodes["open-app"].getAttribute("href"), APP);
+  assert.equal(doc.nodes["open-web"].getAttribute("href"), WEB);
+});

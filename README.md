@@ -8,7 +8,7 @@ Static GitHub Pages utility. It checks one session id and opens Claude. It does 
 
 `s` must match `^session_[A-Za-z0-9]+$` and must appear once. A missing, invalid, or repeated `s` stops on this page. No other parameter is used as a destination.
 
-Working example, once GitHub Pages is enabled:
+Working example:
 
 `https://jfcrockett.github.io/claude-session-redirect/cc/?s=session_01XANLEKYHhnouszW5pTBCm6`
 
@@ -18,6 +18,8 @@ For that id the only destinations are:
 - `https://claude.ai/code/session_01XANLEKYHhnouszW5pTBCm6`
 
 The page assigns the app URL on load, then leaves **Open in Claude** and **Open in browser** in place. Those labels are the fallbacks if the app does not open.
+
+After that valid handoff, or after a click on **Open in Claude**, the page tries to close the tab only if it was visible and then stays hidden for 1.2 seconds. It does not close while it remains visible, does not close on blur, and does not close for a missing, invalid, or duplicate id. Hiding the page is not proof the macOS app opened. Browsers usually refuse `window.close()` for a tab the user opened; the page then says "If Claude opened, you can close this tab." Both links stay.
 
 ## Checks
 

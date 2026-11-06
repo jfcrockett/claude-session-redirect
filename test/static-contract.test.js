@@ -72,6 +72,10 @@ test("redirect script hard-codes only the two Claude destinations", () => {
   assert.equal(read("cc/page.js").includes("http"), false);
   assert.equal(read("cc/page.js").includes("assign"), false);
   assert.equal(read("cc/page.js").includes("location.href"), false);
+  assert.equal(
+    read("cc/page.js").includes("renderSessionPage(document, window.location.search, window.location, window)"),
+    true,
+  );
 });
 
 test("utility page keeps referrer protection, fallbacks, and relative assets", () => {

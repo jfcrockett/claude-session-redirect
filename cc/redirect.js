@@ -11,6 +11,8 @@
   var SESSION_PREFIX = "session_";
   var APP_PREFIX = "claude://code/";
   var WEB_PREFIX = "https://claude.ai/code/";
+  var HANDOFF_CLOSE_DELAY_MS = 1200;
+  var CLOSE_HINT = "If Claude opened, you can close this tab.";
 
   function isValidSessionId(value) {
     if (typeof value !== "string") return false;
@@ -134,7 +136,67 @@
     return node;
   }
 
-  function hideDestinations(actions, sessionLine, sessionId, openApp, openWeb) {
+  // After a valid claude:// handoff, try to close only if this page was visible
+// and then stayed hidden. A protocol prompt leaves the page visible, so this
+// does not close while that prompt is up. Blur is not a signal. A hidden page
+// is not proof the native app opened. Browsers often refuse close() unless
+// script opened the tab; the hint covers that refusal.
+function createTabCloser(doc, win, options) {
+  if (!doc || typeof doc.addEventListener !== "function" || !win) {
+    return { arm: function () {} };
+  }
+  var setTimer = options && typeof options.setTimer === "function"
+    ? options.setTimer
+    : function (fn, ms) { return setTimeout(fn, ms); };
+  var clearTimer = options && typeof options.clearTimer === "function"
+    ? options.clearTimer
+    : function (id) { clearTimeout(id); };
+  var status = typeof doc.getElementById === "function" ? doc.getElementById("status") : null;
+  var armed = false;
+  var sawVisible = false;
+  var timer = null;
+
+  function cancelTimer() {
+    if (timer == null) return;
+    clearTimer(timer);
+    timer = null;
+  }
+
+  function tryClose() {
+    timer = null;
+    if (!armed || doc.visibilityState !== "hidden") return;
+    try {
+      if (typeof win.close === "function") win.close();
+    } catch (err) {
+      // The page stays open and the hint explains that.
+    }
+    if (win.closed === true) return;
+    if (status) status.textContent = CLOSE_HINT;
+  }
+
+  function onVisibility() {
+    if (doc.visibilityState === "visible") {
+      sawVisible = true;
+      cancelTimer();
+      return;
+    }
+    if (doc.visibilityState !== "hidden" || !armed || !sawVisible) return;
+    cancelTimer();
+    timer = setTimer(tryClose, HANDOFF_CLOSE_DELAY_MS);
+  }
+
+  doc.addEventListener("visibilitychange", onVisibility);
+
+  return {
+    arm: function () {
+      armed = true;
+      sawVisible = doc.visibilityState === "visible";
+      cancelTimer();
+    },
+  };
+}
+
+function hideDestinations(actions, sessionLine, sessionId, openApp, openWeb) {
     actions.hidden = true;
     sessionLine.hidden = true;
     sessionId.textContent = "";
@@ -142,7 +204,7 @@
     openWeb.removeAttribute("href");
   }
 
-  function renderSessionPage(doc, search, locationObject) {
+  function renderSessionPage(doc, search, locationObject, win, options) {
     var status = element(doc, "status");
     var error = element(doc, "error");
     var actions = element(doc, "actions");
@@ -183,9 +245,18 @@
     actions.hidden = false;
     status.textContent = "Trying to open the Claude app. If it does not open, use a link below.";
 
+    var closer = createTabCloser(doc, win, options);
+    if (typeof openApp.addEventListener === "function") {
+      openApp.addEventListener("click", function () {
+        if (openApp.getAttribute("href") !== dest.app) return;
+        closer.arm();
+      });
+    }
+
     if (locationObject != null) {
       try {
         attemptAppRedirect(dest.app, locationObject);
+        closer.arm();
       } catch (err) {
         status.textContent = "The Claude app did not open automatically. Use a link below.";
       }
@@ -201,5 +272,7 @@
     destinations: destinations,
     attemptAppRedirect: attemptAppRedirect,
     renderSessionPage: renderSessionPage,
+    HANDOFF_CLOSE_DELAY_MS: HANDOFF_CLOSE_DELAY_MS,
+    CLOSE_HINT: CLOSE_HINT,
   });
 });

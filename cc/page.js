@@ -19,7 +19,7 @@
   }
 
   try {
-    api.renderSessionPage(document, window.location.search, window.location);
+    api.renderSessionPage(document, window.location.search, window.location, window);
   } catch (err) {
     showLoadError();
   }
