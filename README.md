@@ -8,7 +8,7 @@ Static GitHub Pages utility. It checks one session id and opens Claude. It does 
 
 `s` must match `^session_[A-Za-z0-9]+$` and must appear once. A missing, invalid, or repeated `s` stops on this page. No other parameter is used as a destination.
 
-Working example:
+Working example, once GitHub Pages is enabled:
 
 `https://jfcrockett.github.io/claude-session-redirect/cc/?s=session_01XANLEKYHhnouszW5pTBCm6`
 
@@ -27,4 +27,4 @@ Those tests run in Node. They do not launch the Claude macOS app, and a Linux br
 
 ## Pages
 
-Published from the `main` branch, root folder, with Jekyll disabled (`.nojekyll`). The document sets `no-referrer`. GitHub Pages does not provide a custom HTTP `Referrer-Policy` header for this static site.
+The publishing source is the `main` branch, root folder. `.nojekyll` disables Jekyll. Turning the site on requires repository administration (`pages=write` and `administration=write`). The page sets `no-referrer`. GitHub Pages does not provide a custom HTTP `Referrer-Policy` header for this static site.
